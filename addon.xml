@@ -6,21 +6,19 @@
 	<extension point="xbmc.service" library="resources/lib/service.py"/>
 	<extension point="xbmc.addon.metadata">
 		<platform>linux</platform>
-		<platform>linux</platform>
 		<summary lang="en">Enables the control of Kodi from desktop controls.</summary>
 		<summary lang="de_DE">Ermöglicht die Steuerung von Kodi durch Desktopanwendungen.</summary>
-		<description lang="en">MPRIS implementation. Forwards multimedia Play/Pause/Next/Previous Keboard/Remote strokes to Kodi, even if Kodi is in background. Enabels the control of Kodi from system tray or lock screen player controls.</description>
+		<description lang="en">MPRIS implementation. Forwards multimedia (play,pause,next,previous) keboard or remote strokes to Kodi, even if Kodi is in background. Enabels the control of Kodi from system tray or lock screen player controls.</description>
 		<description lang="de_DE">MPRIS Implementierung. Leitet Multimedia Fernsteuer- und Tastaturkommandos (Play,Pause,Next,Previous) and Kodi weiter, auch wenn Kodi im Hintergrund läuft. Ermöglicht das Steuern von Kodi durch Systemtray- und Lockscreen- Steuerungen.</description>
 		<license>GPL-3.0-or-later</license>
 		<forum></forum>
 		<source>https://github.com/wastis/MediaPlayerRemoteInterface</source>
 		<disclaimer lang="en_GB">https://github.com/wastis/MediaPlayerRemoteInterface</disclaimer>
 		<disclaimer lang="de_DE">https://github.com/wastis/MediaPlayerRemoteInterface</disclaimer>
-		<news>
-	</news>
-	<assets>
-		<icon>resources/media/icon2.png</icon>
-		<fanart>resources/media/fanart.jpg</fanart>
-	</assets>
+		<news>v1.0.0 Initial Version</news>
+		<assets>
+			<icon>resources/media/icon2.png</icon>
+			<fanart>resources/media/fanart.jpg</fanart>
+		</assets>
 	</extension>
 </addon>
