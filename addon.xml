@@ -19,6 +19,7 @@
 		<assets>
 			<icon>resources/media/icon2.png</icon>
 			<fanart>resources/media/fanart.jpg</fanart>
+			<screenshot>resources/media/kodi-cinnamon-applet-player.png</screenshot>
 		</assets>
 	</extension>
 </addon>
