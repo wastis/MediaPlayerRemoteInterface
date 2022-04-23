@@ -12,6 +12,7 @@
 
 import dbussy as dbus
 import ravel
+import json
 
 from kodiif import KodiInfo
 
@@ -21,30 +22,11 @@ from kodiif import KodiInfo
 	name = "org.mpris.MediaPlayer2.Player"
 	)
 class MediaPlayer2Player :
-	__slots__ = ("bus",)
+	__slots__ = ("bus","status",)
 
 	def __init__(self, bus) :
 		self.bus = bus
-
-	def invalidate_play(self):
-		self.bus.prop_changed \
-			(
-			path = "/org/mpris/MediaPlayer2",
-			interface = "org.mpris.MediaPlayer2.Player",
-			propname = "PlaybackStatus",
-			proptype = 's',
-			propvalue = KodiInfo.PlayStatus()
-			)
-
-	def invalidate_info(self):
-		self.bus.prop_changed \
-			(
-			path = "/org/mpris/MediaPlayer2",
-			interface = "org.mpris.MediaPlayer2.Player",
-			propname = "Metadata",
-			proptype = 'a{sv}',
-			propvalue = KodiInfo.GetMediaInfo()
-			)
+		self.status = "Stopped"
 
 	@ravel.method \
 	  (
@@ -54,7 +36,6 @@ class MediaPlayer2Player :
 	  )
 	def handle_Previous(self) :
 		KodiInfo.PlayGoTo("previous")
-		self.invalidate_info()
 
 	@ravel.method \
 	  (
@@ -64,7 +45,6 @@ class MediaPlayer2Player :
 	  )
 	def handle_Next(self) :
 		KodiInfo.PlayGoTo("next")
-		self.invalidate_info()
 
 	@ravel.method \
 	  (
@@ -74,7 +54,6 @@ class MediaPlayer2Player :
 	  )
 	def handle_Stop(self) :
 		KodiInfo.PlayStop()
-		self.invalidate_play()
 
 	@ravel.method \
 	  (
@@ -84,7 +63,6 @@ class MediaPlayer2Player :
 	  )
 	def handle_Play(self) :
 		KodiInfo.PlayOnlyPlay()
-		self.invalidate_play()
 
 	@ravel.method \
 	  (
@@ -94,7 +72,6 @@ class MediaPlayer2Player :
 	  )
 	def handle_Pause(self) :
 		KodiInfo.PlayOnlyPause()
-		self.invalidate_play()
 
 	@ravel.method \
 	  (
@@ -104,7 +81,6 @@ class MediaPlayer2Player :
 	  )
 	def handle_PlayPause(self) :
 		KodiInfo.PlayPause()
-		self.invalidate_play()
 
 	@ravel.method \
 	  (
@@ -138,7 +114,7 @@ class MediaPlayer2Player :
 		arg_keys = ["track_id","position"],
 	  )
 	def handle_SetPosition(self, track_id, position) :
-		pass
+		KodiInfo.PlayPosition(track_id, position)
 
 	@ravel.propgetter \
 	  (
@@ -347,6 +323,15 @@ class MediaPlayer2Player :
 	def get_Position(self) :
 		return KodiInfo.PlayGetPosition()
 
+	@ravel.signal \
+		(
+		name = "Seeked",
+		in_signature = \
+			[
+			dbus.BasicType(dbus.TYPE.INT64)
+			],
+		)
+
 	def send_Seeked(self, pos) :
 		self.bus.send_signal \
 		  (
@@ -355,3 +340,52 @@ class MediaPlayer2Player :
 			name = "Seeked",
 			args = [pos]
 		  )
+
+	def invalidate_seek(self, data = None):
+		if data is None:
+			self.send_Seeked(KodiInfo.PlayGetPosition())
+		else:
+			data = json.loads(data)
+
+			seekt = KodiInfo.get_tag(data,["player","time"])
+			if seekt is None: return
+
+			pos = int(seekt["milliseconds"])\
+				+ int(seekt["seconds"]) * 1000\
+				+ int(seekt["minutes"]) * 60000\
+				+ int(seekt["hours"]) * 3600000
+
+			self.send_Seeked(pos * 1000)
+
+	def send_playback_status(self, status) :
+		self.bus.send_signal \
+		  (
+			path = "/org/mpris/MediaPlayer2",
+			interface = "org.freedesktop.DBus.Properties",
+			name = "PropertiesChanged",
+			args = ['org.mpris.MediaPlayer2.Player', {'PlaybackStatus': ('s', status)}, []]
+		  )
+
+		if status in ["Paused", "Playing"]:
+			self.send_metadata(KodiInfo.GetMediaInfo())
+
+		if status == "Stopped":
+			self.send_metadata({})
+
+		self.status = status
+
+	def send_metadata(self, data = None) :
+		if data is None:
+			data = KodiInfo.GetMediaInfo()
+
+		self.bus.send_signal \
+		  (
+			path = "/org/mpris/MediaPlayer2",
+			interface = "org.freedesktop.DBus.Properties",
+			name = "PropertiesChanged",
+			args = ['org.mpris.MediaPlayer2.Player', {'Metadata': ('a{sv}', data)}, []]
+		  )
+
+	@staticmethod
+	def get_basic_item():
+		return KodiInfo.GetBasicItem()

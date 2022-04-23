@@ -33,12 +33,17 @@ class MpriMonitor( xbmc.Monitor ):
 			if self.waitForAbort( 10 ):
 				break
 
-	def onNotification( self, sender, method, _data ):
-		log(f"{sender} {method}")
-		if method in ["Player.OnStop","Player.OnResume","Player.OnPlay","Player.OnPause"]:
-			log("invalidate_play")
-			self.mpr.invalidate_play()
+	def onNotification( self, sender, method, data ):
+		log(f"{sender} {method} {data}")
 
-		if method in ["Info.OnChanged","Player.OnAVStart"]:
-			log("invalidate_info")
-			self.mpr.invalidate_info()
+		if method in ["Player.OnResume","Player.OnAVStart"]:
+			self.mpr.send_playback_status("Playing")
+
+		if method in ["Player.OnPause"]:
+			self.mpr.send_playback_status("Paused")
+
+		if method in ["Player.OnStop","System.OnQuit"]:
+			self.mpr.send_playback_status("Stopped")
+
+		if method == "Player.OnSeek":
+			self.mpr.invalidate_seek(data)

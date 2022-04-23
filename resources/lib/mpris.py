@@ -27,6 +27,16 @@ class Mpris():
 		self.loop = None
 		self.th = None
 		self.mp2p = None
+		self.last_item = None
+
+	async def poll_info(self):
+		while True:
+			item = self.mp2p.get_basic_item()
+			if self.last_item != item:
+				self.last_item = item
+				self.send_metadata()
+				self.invalidate_seek(None)
+			await asyncio.sleep(1)
 
 	def run(self):
 		log("setup event loop")
@@ -34,6 +44,7 @@ class Mpris():
 		mpris_bus_name = "org.mpris.MediaPlayer2.kodi"
 
 		self.loop = asyncio.new_event_loop()
+		self.loop.create_task(self.poll_info())
 
 		bus = ravel.session_bus()
 
@@ -92,10 +103,14 @@ class Mpris():
 		self.th = Thread(target = self.run)
 		self.th.start()
 
-	def invalidate_play(self):
+	def invalidate_seek(self, data):
 		if self.mp2p is not None:
-			self.mp2p.invalidate_play()
+			self.mp2p.invalidate_seek(data)
 
-	def invalidate_info(self):
+	def send_playback_status(self,status):
 		if self.mp2p is not None:
-			self.mp2p.invalidate_info()
+			self.mp2p.send_playback_status(status)
+
+	def send_metadata(self):
+		if self.mp2p is not None:
+			self.mp2p.send_metadata()
