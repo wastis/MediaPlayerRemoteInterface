@@ -22,11 +22,21 @@ from kodiif import KodiInfo
 	name = "org.mpris.MediaPlayer2.Player"
 	)
 class MediaPlayer2Player :
-	__slots__ = ("bus","status",)
+	__slots__ = ("bus",)
 
 	def __init__(self, bus) :
 		self.bus = bus
-		self.status = "Stopped"
+
+	def send_prop_change(self, prop,  valtype, value):
+		self.bus.send_signal \
+		  (
+			path = "/org/mpris/MediaPlayer2",
+			interface = "org.freedesktop.DBus.Properties",
+			name = "PropertiesChanged",
+			args = ['org.mpris.MediaPlayer2.Player',
+				{prop: (valtype, value)},
+				[]]
+		  )
 
 	@ravel.method \
 	  (
@@ -35,7 +45,7 @@ class MediaPlayer2Player :
 		out_signature = "",
 	  )
 	def handle_Previous(self) :
-		KodiInfo.PlayGoTo("previous")
+		KodiInfo.PlayGoToPrev()
 
 	@ravel.method \
 	  (
@@ -114,7 +124,8 @@ class MediaPlayer2Player :
 		arg_keys = ["track_id","position"],
 	  )
 	def handle_SetPosition(self, track_id, position) :
-		KodiInfo.PlayPosition(track_id, position)
+		if KodiInfo.PlayPosition(track_id, position) is not None:
+			self.send_prop_change('Position','x', position)
 
 	@ravel.propgetter \
 	  (
@@ -323,6 +334,10 @@ class MediaPlayer2Player :
 	def get_Position(self) :
 		return KodiInfo.PlayGetPosition()
 
+	#
+	#	signals
+	#
+
 	@ravel.signal \
 		(
 		name = "Seeked",
@@ -331,7 +346,6 @@ class MediaPlayer2Player :
 			dbus.BasicType(dbus.TYPE.INT64)
 			],
 		)
-
 	def send_Seeked(self, pos) :
 		self.bus.send_signal \
 		  (
@@ -341,50 +355,35 @@ class MediaPlayer2Player :
 			args = [pos]
 		  )
 
+	#
+	#	handle messages from Kodi
+	#
+
 	def invalidate_seek(self, data = None):
 		if data is None:
 			self.send_Seeked(KodiInfo.PlayGetPosition())
 		else:
 			data = json.loads(data)
 
-			seekt = KodiInfo.get_tag(data,["player","time"])
-			if seekt is None: return
+			item = KodiInfo.get_tag(data,["item","id"])
+			if item is None:
+				item = "{:x}".format(abs(hash(KodiInfo.get_tag(data,["item","title"]))))
 
-			pos = int(seekt["milliseconds"])\
-				+ int(seekt["seconds"]) * 1000\
-				+ int(seekt["minutes"]) * 60000\
-				+ int(seekt["hours"]) * 3600000
+			playerid = 	KodiInfo.get_tag(data,["player","playerid"])
 
-			self.send_Seeked(pos * 1000)
+			if KodiInfo.is_playing_item(playerid, item):
+				seekt = KodiInfo.get_tag(data,["player","time"])
+				if seekt is None: return
+				self.send_Seeked(KodiInfo.time_to_micro(seekt))
 
 	def send_playback_status(self, status) :
-		self.bus.send_signal \
-		  (
-			path = "/org/mpris/MediaPlayer2",
-			interface = "org.freedesktop.DBus.Properties",
-			name = "PropertiesChanged",
-			args = ['org.mpris.MediaPlayer2.Player', {'PlaybackStatus': ('s', status)}, []]
-		  )
-
-		if status in ["Paused", "Playing"]:
-			self.send_metadata(KodiInfo.GetMediaInfo())
-
-		if status == "Stopped":
-			self.send_metadata({})
-
-		self.status = status
+		self.send_prop_change('PlaybackStatus','s', status)
 
 	def send_metadata(self, data = None) :
 		if data is None:
 			data = KodiInfo.GetMediaInfo()
 
-		self.bus.send_signal \
-		  (
-			path = "/org/mpris/MediaPlayer2",
-			interface = "org.freedesktop.DBus.Properties",
-			name = "PropertiesChanged",
-			args = ['org.mpris.MediaPlayer2.Player', {'Metadata': ('a{sv}', data)}, []]
-		  )
+		self.send_prop_change('Metadata','a{sv}', data)
 
 	@staticmethod
 	def get_basic_item():

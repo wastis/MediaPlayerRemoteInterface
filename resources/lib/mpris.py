@@ -55,7 +55,8 @@ class Mpris():
 		bus.request_name\
 			(
 			bus_name = mpris_bus_name,
-			flags = DBUS.NAME_FLAG_DO_NOT_QUEUE
+			flags = DBUS.NAME_FLAG_ALLOW_REPLACEMENT\
+				| DBUS.NAME_FLAG_REPLACE_EXISTING
 			)
 		bus.register \
 		  (

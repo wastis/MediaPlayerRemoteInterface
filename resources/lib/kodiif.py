@@ -15,6 +15,38 @@ import json
 import xbmc
 
 class KodiInfo():
+	#
+	#	helper functions
+	#
+
+	@staticmethod
+	def time_to_micro(time_dict):
+		return 1000\
+			* (
+			int(time_dict["milliseconds"])\
+			+ int(time_dict["seconds"]) * 1000\
+			+ int(time_dict["minutes"]) * 60000\
+			+ int(time_dict["hours"]) * 3600000
+			)
+
+	@staticmethod
+	def clear_file_name(filename):
+		if not filename:
+			return ""
+		result = filename\
+		.replace('%2f','/')\
+		.replace('%3a',':')\
+		.replace('%20',' ')\
+		.replace("image://","")
+
+		if result[0] == "/":
+			result = "file://" + result
+
+		if result[-1]== "/":
+			result = result[:-1]
+
+		return result
+
 	@classmethod
 	def kodi_json_rpc(cls,rpc):
 		rpc["jsonrpc"]="2.0"
@@ -34,6 +66,22 @@ class KodiInfo():
 	def get_result(cls, result, path, default = None):
 		path = ["result"] + path
 		return cls.get_tag(result,path,default)
+
+	@classmethod
+	def is_playing_item(cls, playerid, itemid):
+		item = cls.kodi_json_rpc({
+			"method":"Player.GetItem",
+			"params":{ "playerid":playerid}
+			})
+
+		try:
+			return int(itemid) == cls.get_result(item,['item',"id"])
+		except ValueError:
+			return itemid == "{:x}".format(abs(hash(cls.get_result(item,['item',"label"]))))
+
+	#
+	# ***********************************************************
+	#
 
 	@classmethod
 	def GetSpeed(cls, playerid):
@@ -79,24 +127,6 @@ class KodiInfo():
 			})
 
 		return str(cls.get_result(result,["item","label"]))
-
-	@staticmethod
-	def clear_file_name(filename):
-		if not filename:
-			return ""
-		result = filename\
-		.replace('%2f','/')\
-		.replace('%3a',':')\
-		.replace('%20',' ')\
-		.replace("image://","")
-
-		if result[0] == "/":
-			result = "file://" + result
-
-		if result[-1]== "/":
-			result = result[:-1]
-
-		return result
 
 	@classmethod
 	def GetAudioDetails(cls,item):
@@ -202,12 +232,7 @@ class KodiInfo():
 		if ttime is None:
 			return 0
 
-		totaltime = int(ttime["milliseconds"])\
-			+ int(ttime["seconds"]) * 1000\
-			+ int(ttime["minutes"]) * 60000\
-			+ int(ttime["hours"]) * 3600000
-
-		return totaltime * 1000
+		return cls.time_to_micro(ttime)
 
 	@classmethod
 	def GetMediaInfo(cls):
@@ -221,7 +246,7 @@ class KodiInfo():
 		item = cls.GetItem(player["playerid"])
 
 		if player["type"]== 'audio':
-			print(item)
+			#print(item)
 			result = cls.GetAudioDetails(item)
 
 		elif player["type"]== 'video':
@@ -237,9 +262,13 @@ class KodiInfo():
 				result['xesam:title'] = ('s',item['label'])
 
 		if 'xesam:title' not in result:
-			result['xesam:title'] = item['label']
+			result['xesam:title'] = ('s', item['label'])
 
-		result["mpris:trackid"] = ('s', '/org/mpris/MediaPlayer2/Player')
+		if "id" in item:
+			result["mpris:trackid"] = ('s', '/org/mpris/MediaPlayer2/Player/{}'.format(item["id"]))
+		else:
+			result["mpris:trackid"] = ('s', '/org/mpris/MediaPlayer2/Player/{:x}'.format(abs(hash(item["label"]))))
+
 		legth = cls.GetTotalTime(player["playerid"])
 		if legth:
 			result["mpris:length"] = ('x', legth)
@@ -301,6 +330,29 @@ class KodiInfo():
 				"params": {
 					"playerid": player['playerid'],
 					"to":direction
+					}})
+	@classmethod
+	def PlayGoToPrev(cls):
+		player = cls.GetActivePlayers()
+		if player:
+			position = cls.get_result\
+				(
+					cls.kodi_json_rpc({
+						"method":"Player.GetProperties",
+						"params": {"playerid":player["playerid"], "properties": ["position"]}
+						}),
+					["position"],
+					0
+				)
+
+			if position > 0:
+				position-=1
+
+			cls.kodi_json_rpc({
+				"method": "Player.GoTo",
+				"params": {
+					"playerid": player['playerid'],
+					"to":position
 					}})
 
 	@classmethod
@@ -408,12 +460,7 @@ class KodiInfo():
 		if ptime is None:
 			return 0
 
-		playtime = int(ptime["milliseconds"])\
-			+ int(ptime["seconds"]) * 1000\
-			+ int(ptime["minutes"]) * 60000\
-			+ int(ptime["hours"]) * 3600000
-
-		return playtime * 1000
+		return cls.time_to_micro(ptime)
 
 	@classmethod
 	def PlayGetPosition(cls):
@@ -441,14 +488,15 @@ class KodiInfo():
 		cls.player_seek(player['playerid'],seek)
 
 	@classmethod
-	def PlayPosition(cls,_,position):
+	def PlayPosition(cls, track_id, position):
 		player = cls.GetActivePlayers()
 		if not player: return False
 
+		if not cls.is_playing_item(player["playerid"], track_id[31:]):
+			return None
+
 		cur_pos = cls.get_current_position(player["playerid"])
-
 		seek = (position - cur_pos)
-
 		cls.player_seek(player['playerid'],seek)
 
 		return cls.get_current_position(player["playerid"])
