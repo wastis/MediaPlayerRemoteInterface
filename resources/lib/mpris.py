@@ -115,3 +115,7 @@ class Mpris():
 	def send_metadata(self):
 		if self.mp2p is not None:
 			self.mp2p.send_metadata()
+
+	def set_button_status(self):
+		if self.mp2p is not None:
+			self.mp2p.set_button_status()

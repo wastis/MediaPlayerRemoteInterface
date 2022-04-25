@@ -13,6 +13,7 @@
 import os
 import json
 import xbmc
+import xbmcvfs
 
 class KodiInfo():
 	#
@@ -29,10 +30,12 @@ class KodiInfo():
 			+ int(time_dict["hours"]) * 3600000
 			)
 
-	@staticmethod
-	def clear_file_name(filename):
+	@classmethod
+	def clear_file_name(cls, filename):
 		if not filename:
 			return ""
+
+		filename = cls.GetCachedTexture(filename)
 		result = filename\
 		.replace('%2f','/')\
 		.replace('%3a',':')\
@@ -71,13 +74,17 @@ class KodiInfo():
 	def is_playing_item(cls, playerid, itemid):
 		item = cls.kodi_json_rpc({
 			"method":"Player.GetItem",
-			"params":{ "playerid":playerid}
+			"params":{
+				"playerid":playerid
+				}
 			})
+
+		title = cls.get_result(item,['item',"label"]).strip()
 
 		try:
 			return int(itemid) == cls.get_result(item,['item',"id"])
 		except ValueError:
-			return itemid == "{:x}".format(abs(hash(cls.get_result(item,['item',"label"]))))
+			return itemid == "{:x}".format(abs(hash(title)))
 
 	#
 	# ***********************************************************
@@ -107,7 +114,7 @@ class KodiInfo():
 			"method":"Player.GetItem",
 			"params":{\
 				"playerid":player_id,
-				"properties": ["title","showtitle","album","duration","art","artist","genre","year","thumbnail","channel"]
+				"properties": ["title","showtitle","album","duration","art","artist","genre","year","thumbnail","channel", "season", "episode","director"]
 				}
 			})
 
@@ -127,6 +134,30 @@ class KodiInfo():
 			})
 
 		return str(cls.get_result(result,["item","label"]))
+
+	@classmethod
+	def GetCachedTexture(cls,item):
+		result = cls.kodi_json_rpc({
+			"method":"Textures.GetTextures",
+			"params":{\
+				"properties": ["url","cachedurl"],
+				 "filter": {"field": "url", "operator": "is", "value": item}
+				}
+			})
+
+		textures = cls.get_result(result,['textures'])
+
+		if not textures:
+			return item
+
+		url = cls.get_tag(textures[0],['cachedurl'])
+
+		if url is None:
+			return item
+
+		kodi_home = xbmcvfs.translatePath("special://home/")
+
+		return kodi_home + "userdata/Thumbnails/" + url
 
 	@classmethod
 	def GetAudioDetails(cls,item):
@@ -166,12 +197,33 @@ class KodiInfo():
 
 		if item['title']:
 			result['xesam:title'] = ('s',item['title'])
-		if item['showtitle']:
-			result['xesam:album'] = ('s',item['showtitle'])
+		else:
+			result['xesam:title'] = ('s',item['label'])
+
+		info =""
 		if item['year']:
 			result['xesam:contentCreated'] = ('s',"{}".format(item['year']))
+			info ="{} ".format(item['year'])
+
+		if item['showtitle']:
+			if info:
+				info = info + " - "
+			info = info + "{}  ".format(item['showtitle'])
+
+		if item['director']:
+			if info:
+				info = info + " - "
+			info = info + ",".join(item['director'])
+
 		if item['genre']:
 			result['xesam:genre'] = ('as',item['genre'])
+
+		if info:
+			info = info + " - {:02d}x{:02d}".format(item['season'], item['episode'])
+		else:
+			info = "{:02d}x{:02d}".format(item['season'], item['episode'])
+
+		result['xesam:artist'] = ('s',info)
 
 		return result
 
@@ -188,10 +240,24 @@ class KodiInfo():
 
 		if item['title']:
 			result['xesam:title'] = ('s',item['title'])
+		else:
+			result['xesam:title'] = ('s',item['label'])
+
+		info =""
 		if item['year']:
 			result['xesam:contentCreated'] = ('s',"{}".format(item['year']))
+			info = "{} ".format(item['year'])
+
+		if item['director']:
+			if info:
+				info = info + " - "
+			info = info + ",".join(item['director'])
+
 		if item['genre']:
 			result['xesam:genre'] = ('as',item['genre'])
+
+		if info:
+			result['xesam:artist'] = ('s',info)
 
 		return result
 
@@ -209,9 +275,10 @@ class KodiInfo():
 
 		if item['title']:
 			result['xesam:title'] = ("s", item['title'])
-			result['xesam:album'] = ('s', item['channel'])
 		else:
 			result['xesam:title'] = ('s', item['label'])
+
+		result['xesam:artist'] = ('s', item['channel'])
 
 		art = cls.get_tag( item,["art",'thumb'])
 		if art is not None:
@@ -235,23 +302,38 @@ class KodiInfo():
 		return cls.time_to_micro(ttime)
 
 	@classmethod
+	def GetDefaultDetails(cls,item):
+		result = {}
+		art = cls.get_tag( item,["art",'thumb'])
+		if art is None:
+			art = cls.get_tag( item,["thumbnail"])
+		if art is not None:
+			result['mpris:artUrl'] = ('s',cls.clear_file_name(art))
+
+		title = cls.get_tag( item,["title"])
+		if title is None or title == "":
+			title = cls.get_tag( item,["label"])
+
+		if title is not None:
+			result['xesam:title'] = ('s',title)
+
+		return result
+
+	@classmethod
 	def GetMediaInfo(cls):
 		result = {}
 
 		player = cls.GetActivePlayers()
-		#print(player)
 		if not player:
 			return {}
 
 		item = cls.GetItem(player["playerid"])
-
 		if player["type"]== 'audio':
-			#print(item)
 			result = cls.GetAudioDetails(item)
 
 		elif player["type"]== 'video':
 			if "id" not in item or item["type"]=="unknown":
-				result['xesam:title'] = ('s',item['label'])
+				result = cls.GetDefaultDetails(item)
 			elif item["type"]=="episode":
 				result = cls.GetEpisodeDetails(item)
 			elif item["type"]=="movie":
@@ -267,13 +349,32 @@ class KodiInfo():
 		if "id" in item:
 			result["mpris:trackid"] = ('s', '/org/mpris/MediaPlayer2/Player/{}'.format(item["id"]))
 		else:
-			result["mpris:trackid"] = ('s', '/org/mpris/MediaPlayer2/Player/{:x}'.format(abs(hash(item["label"]))))
+			result["mpris:trackid"] = ('s', '/org/mpris/MediaPlayer2/Player/{:x}'.format(abs(hash(item["label"].strip()))))
 
 		legth = cls.GetTotalTime(player["playerid"])
 		if legth:
 			result["mpris:length"] = ('x', legth)
 
 		return result
+
+	#
+	#	player control
+	#
+
+	@classmethod
+	def PlayOpen(cls,filename):
+		if filename.startswith("file://"):
+			filename = filename[7:]\
+			.replace("%20"," ")\
+			.replace('%2f','/')
+
+			if os.path.isfile(filename):
+				cls.kodi_json_rpc({
+					"method": "Player.Open",
+					"params": {
+						"item":{
+							"file":filename
+							}}})
 
 	@classmethod
 	def PlayPause(cls):
@@ -321,54 +422,99 @@ class KodiInfo():
 		if cls.GetSpeed(player['playerid']) == 0: return "Paused"
 		return "Playing"
 
+	#
+	#	previouse - next functions
+	#
+
+	@staticmethod
+	def find_episode(episodes, eid):
+		nr = 0
+		for epidetails in episodes:
+			if epidetails["episodeid"] == eid:
+				return nr
+			nr += 1
+		return None
+
+	@classmethod
+	def EpisodeGoTo(cls, item, direction):
+		episodes = cls.get_result(
+				cls.kodi_json_rpc({
+				"method":"VideoLibrary.GetEpisodes",
+				"params":{\
+					"tvshowid":item["tvshowid"],
+					"season":item["season"],
+					"properties": ["title"]
+					}
+				}),
+				["episodes"]
+				)
+
+		eid = cls.find_episode(episodes,item["id"])
+
+		if direction == "previous":
+			eid = max(0,eid-1)
+		else:
+			eid = min(len(episodes) -1 ,eid+1)
+
+		newepi = episodes[eid]["episodeid"]
+
+		cls.kodi_json_rpc({
+				"method":"player.open",
+				"params":{\
+					"item":{"episodeid":newepi},
+					}
+				})
+
+	@classmethod
+	def PlayListGoTo(cls, playerid, direction):
+		props = cls.kodi_json_rpc({
+				"method":"Player.GetProperties",
+				"params": {"playerid":playerid, "properties": ["playlistid","position"]}
+			})
+
+		pos = cls.get_result(props,['position'])
+
+		playlist = cls.get_result\
+			(
+				cls.kodi_json_rpc({
+					"method":"Playlist.GetItems",
+					"params": {"playlistid":cls.get_result(props,['playlistid']),
+					"properties": ["title"]}
+				}),
+				["items"]
+			)
+
+		if direction == "previous":
+			pos = max(0,pos-1)
+		else:
+			pos = min(len(playlist) -1 ,pos+1)
+
+		cls.kodi_json_rpc({
+			"method": "Player.GoTo",
+			"params": {
+				"playerid": playerid,
+				"to":pos
+				}})
+
 	@classmethod
 	def PlayGoTo(cls,direction):
 		player = cls.GetActivePlayers()
-		if player:
-			cls.kodi_json_rpc({
-				"method": "Player.GoTo",
-				"params": {
-					"playerid": player['playerid'],
-					"to":direction
-					}})
-	@classmethod
-	def PlayGoToPrev(cls):
-		player = cls.GetActivePlayers()
-		if player:
-			position = cls.get_result\
-				(
-					cls.kodi_json_rpc({
-						"method":"Player.GetProperties",
-						"params": {"playerid":player["playerid"], "properties": ["position"]}
-						}),
-					["position"],
-					0
-				)
+		if not player:
+			return
 
-			if position > 0:
-				position-=1
+		item =  cls.get_result(cls.kodi_json_rpc({
+			"method":"Player.GetItem",
+			"params":{\
+				"playerid":player["playerid"],
+				"properties": ["tvshowid","season", "episode"]
+				}
+			}),
+			["item"])
 
-			cls.kodi_json_rpc({
-				"method": "Player.GoTo",
-				"params": {
-					"playerid": player['playerid'],
-					"to":position
-					}})
-
-	@classmethod
-	def PlayOpen(cls,filename):
-		if filename.startswith("file://"):
-			filename = filename[7:]\
-			.replace("%20"," ")\
-			.replace('%2f','/')
-
-			if os.path.isfile(filename):
-				cls.kodi_json_rpc({
-					"method": "Player.Open",
-					"params": {
-						"item":{
-							"file":filename
-							}}})
+		if item["type"]== "episode":
+			cls.EpisodeGoTo(item,direction)
+		else:
+			cls.PlayListGoTo(player["playerid"],direction)
 
 	@classmethod
 	def PlaySetShuffle(cls,toggle):
@@ -522,3 +668,62 @@ class KodiInfo():
 			"method": "Application.SetVolume",
 			"params": { "volume": vol }
 			})
+
+	@classmethod
+	def ButtonStatus(cls):
+		player = cls.GetActivePlayers()
+		if not player:
+			return {"CanGoNext":False,"CanGoPrevious":False,"CanPlay":False,"CanPause":False,"CanSeek":True}
+		else:
+			cannext = False
+			canprev = False
+
+			props = cls.kodi_json_rpc({
+					"method":"Player.GetProperties",
+					"params": {
+						"playerid": player['playerid'],
+						"properties": ["canseek","canchangespeed"]
+						}})
+
+			#canseek =  cls.get_result(props, ["canseek"])
+			canpause =  cls.get_result(props, ["canchangespeed"])
+
+			itype =  cls.get_result\
+				(
+					cls.kodi_json_rpc({
+					"method":"Player.GetItem",
+					"params":{\
+						"playerid":player["playerid"]
+						}
+					}),
+					["item","type"]
+				)
+
+			if itype == 'episode':
+				cannext = True
+				canprev = True
+			else:
+				plistid = cls.get_result\
+					(
+						cls.kodi_json_rpc({
+							"method":"Player.GetProperties",
+							"params": {"playerid":player["playerid"], "properties": ["playlistid"]}
+						}),
+					["playlistid"]
+				)
+
+				playlist = cls.get_result\
+				(
+					cls.kodi_json_rpc({
+						"method":"Playlist.GetItems",
+						"params": {"playlistid":plistid,
+						"properties": ["title"]}
+					}),
+					["items"]
+				)
+
+				if len(playlist) > 1:
+					cannext = True
+					canprev = True
+
+			return {"CanGoNext":cannext,"CanGoPrevious":canprev,"CanPlay":True,"CanPause":canpause,"CanSeek":True}
