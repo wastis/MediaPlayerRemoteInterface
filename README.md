@@ -1,14 +1,15 @@
 # Multimedia Player Remote Interfaces for Kodi
 
-MPRIS implementation for Kodi. 
+This Kodi addon provides a MPRIS interface for better integration of Kodi into Linux desktops.
 
-This service addon enables the control of Kodi from desktop controls and keyboard multimedia keys.  
+It forwards the desktop- and keyboard multimedia control events to Kodi and provides meta data back to the desktop for display in system tray controls.
 
-Such controls can be the system tray Media Controls in Ubuntu, for example.
+![Cinnamon Sound Tray Icon](/resources/media/kodi-cinnamon-applet-player-small.jpg)
 
-#### Testing
 
-For simple command line control of Kodi playerctl can be used. 
+**Testing via command line**
+
+For simple command line control of Kodi the tool playerctl can be used. 
 
 The following example requires Kodi up and running and the Multimedia Player Remote Interface addon installed and enabled in Kodi. 
 
