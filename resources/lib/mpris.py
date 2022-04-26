@@ -11,11 +11,11 @@
 #
 
 import asyncio
+from threading import Thread
 
 from dbussy import DBUS
 import ravel
 
-from threading import Thread
 from log import log
 from handle import handle
 
@@ -26,6 +26,7 @@ class Mpris():
 	def __init__(self):
 		self.loop = None
 		self.th = None
+		self.mp2 = None
 		self.mp2p = None
 		self.last_item = None
 
@@ -115,7 +116,3 @@ class Mpris():
 	def send_metadata(self):
 		if self.mp2p is not None:
 			self.mp2p.send_metadata()
-
-	def set_button_status(self):
-		if self.mp2p is not None:
-			self.mp2p.set_button_status()

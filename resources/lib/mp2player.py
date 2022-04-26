@@ -10,9 +10,10 @@
 #	or (at your option) any later version.
 #
 
+import json
+
 import dbussy as dbus
 import ravel
-import json
 
 from kodiif import KodiInfo
 
@@ -22,15 +23,10 @@ from kodiif import KodiInfo
 	name = "org.mpris.MediaPlayer2.Player"
 	)
 class MediaPlayer2Player :
-	__slots__ = ("bus","CanGoNext","CanGoPrevious","CanPlay","CanPause","CanSeek")
+	__slots__ = ("bus",)
 
 	def __init__(self, bus) :
 		self.bus = bus
-		self.CanGoNext = False
-		self.CanGoPrevious = False
-		self.CanPlay = False
-		self.CanPause = False
-		self.CanSeek = True
 
 	def send_prop_change(self, prop,  valtype, value):
 		self.bus.send_signal \
@@ -50,7 +46,7 @@ class MediaPlayer2Player :
 		out_signature = "",
 	  )
 	def handle_Previous(self) :
-		KodiInfo.PlayGoTo("previous")
+		KodiInfo.SendKey("prev_track")
 
 	@ravel.method \
 	  (
@@ -59,7 +55,7 @@ class MediaPlayer2Player :
 		out_signature = "",
 	  )
 	def handle_Next(self) :
-		KodiInfo.PlayGoTo("next")
+		KodiInfo.SendKey("next_track")
 
 	@ravel.method \
 	  (
@@ -68,7 +64,7 @@ class MediaPlayer2Player :
 		out_signature = "",
 	  )
 	def handle_Stop(self) :
-		KodiInfo.PlayStop()
+		KodiInfo.SendKey("stop")
 
 	@ravel.method \
 	  (
@@ -77,7 +73,7 @@ class MediaPlayer2Player :
 		out_signature = "",
 	  )
 	def handle_Play(self) :
-		KodiInfo.PlayOnlyPlay()
+		KodiInfo.SendKey("play_pause")
 
 	@ravel.method \
 	  (
@@ -86,10 +82,7 @@ class MediaPlayer2Player :
 		out_signature = "",
 	  )
 	def handle_Pause(self) :
-		if self.CanPause:
-			KodiInfo.PlayOnlyPause()
-		else:
-			KodiInfo.PlayStop()
+		KodiInfo.SendKey("play_pause")
 
 	@ravel.method \
 	  (
@@ -98,10 +91,7 @@ class MediaPlayer2Player :
 		out_signature = "",
 	  )
 	def handle_PlayPause(self) :
-		if self.CanPause:
-			KodiInfo.PlayPause()
-		else:
-			KodiInfo.PlayStop()
+		KodiInfo.SendKey("play_pause")
 
 	@ravel.method \
 	  (
@@ -293,7 +283,7 @@ class MediaPlayer2Player :
 		.PROP_CHANGE_NOTIFICATION.NEW_VALUE,
 	  )
 	def get_CanPlay(self) :
-		return self.CanPlay
+		return True
 
 	@ravel.propgetter \
 	  (
@@ -303,7 +293,7 @@ class MediaPlayer2Player :
 		.PROP_CHANGE_NOTIFICATION.NEW_VALUE,
 	  )
 	def get_CanPause(self) :
-		return self.CanPause
+		return True
 
 	@ravel.propgetter \
 	  (
@@ -313,7 +303,7 @@ class MediaPlayer2Player :
 		.PROP_CHANGE_NOTIFICATION.NEW_VALUE,
 	  )
 	def get_CanSeek(self) :
-		return self.CanSeek
+		return True
 
 	@ravel.propgetter \
 	  (
@@ -323,7 +313,7 @@ class MediaPlayer2Player :
 		.PROP_CHANGE_NOTIFICATION.NEW_VALUE,
 	  )
 	def get_CanGoNext(self) :
-		return self.CanGoNext
+		return True
 
 	@ravel.propgetter \
 	  (
@@ -333,7 +323,7 @@ class MediaPlayer2Player :
 		.PROP_CHANGE_NOTIFICATION.NEW_VALUE,
 	  )
 	def get_CanGoPrevious(self) :
-		return self.CanGoPrevious
+		return True
 
 	@ravel.propgetter \
 	  (
@@ -395,13 +385,6 @@ class MediaPlayer2Player :
 			data = KodiInfo.GetMediaInfo()
 
 		self.send_prop_change('Metadata','a{sv}', data)
-
-	def set_button_status(self):
-		cans = KodiInfo.ButtonStatus()
-
-		for key,val in cans.items():
-			setattr(self,key,val)
-			self.send_prop_change(key,'b',val)
 
 	@staticmethod
 	def get_basic_item():

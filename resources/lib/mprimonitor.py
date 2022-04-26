@@ -44,11 +44,9 @@ class MpriMonitor( xbmc.Monitor ):
 
 		if method in ["Player.OnStop"]:
 			self.mpr.send_playback_status("Stopped")
-			self.mpr.set_button_status()
 
 		if method == "Player.OnSeek":
 			self.mpr.invalidate_seek(data)
 
 		if method in ["Player.OnAVStart"]:
 			self.mpr.send_metadata()
-			self.mpr.set_button_status()
