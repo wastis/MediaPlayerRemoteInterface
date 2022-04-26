@@ -29,6 +29,7 @@ class Mpris():
 		self.mp2 = None
 		self.mp2p = None
 		self.last_item = None
+		self.owner = False
 
 	async def poll_info(self):
 		while True:
@@ -53,12 +54,15 @@ class Mpris():
 		self.mp2p = MediaPlayer2Player(bus)
 
 		bus.attach_asyncio(self.loop)
-		bus.request_name\
+
+		if bus.request_name\
 			(
 			bus_name = mpris_bus_name,
-			flags = DBUS.NAME_FLAG_ALLOW_REPLACEMENT\
-				| DBUS.NAME_FLAG_REPLACE_EXISTING
-			)
+			flags = DBUS.NAME_FLAG_DO_NOT_QUEUE
+			) != DBUS.REQUEST_NAME_REPLY_PRIMARY_OWNER:
+				return
+		self.owner = True
+
 		bus.register \
 		  (
 			path = "/",
@@ -82,6 +86,15 @@ class Mpris():
 			else:
 				break
 
+		for task in \
+			(lambda : asyncio.Task.all_tasks(bus.loop), lambda : asyncio.all_tasks(bus.loop)) \
+				[hasattr(asyncio, "all_tasks")]():
+			task.cancel()
+			try :
+				bus.loop.run_until_complete(task)
+			except asyncio.CancelledError :
+				pass
+
 		bus.unregister \
 		  (
 			path = "/",
@@ -97,6 +110,8 @@ class Mpris():
 		log("loop is running: {}".format(self.loop.is_running()))
 
 	def stop(self):
+		if not self.owner:
+			return
 		log("on stop loop is running: {}".format(self.loop.is_running()))
 		self.loop.call_soon_threadsafe(self.loop.stop)
 		self.th.join()

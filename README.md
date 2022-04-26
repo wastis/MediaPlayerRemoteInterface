@@ -6,8 +6,7 @@ It forwards the desktop- and keyboard multimedia control events to Kodi and prov
 
 ![Cinnamon Sound Tray Icon](/resources/media/kodi-cinnamon-applet-player-small.jpg)
 
-
-**Testing via command line**
+## Testing via command line
 
 For simple command line control of Kodi the tool playerctl can be used. 
 
