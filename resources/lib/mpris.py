@@ -12,12 +12,16 @@
 
 import asyncio
 from threading import Thread
+import time
 
 from dbussy import DBUS
+from dbussy import DBusError
+
 import ravel
 
 from log import log
 from handle import handle
+from handle import infhandle
 
 from mp2 import MediaPlayer2
 from mp2player import MediaPlayer2Player
@@ -33,34 +37,42 @@ class Mpris():
 
 	async def poll_info(self):
 		while True:
-			item = self.mp2p.get_basic_item()
-			if self.last_item != item:
-				self.last_item = item
-				self.send_metadata()
-				self.invalidate_seek(None)
-			await asyncio.sleep(1)
+			try:
+				item = self.mp2p.get_basic_item()
+				if self.last_item != item:
+					self.last_item = item
+					self.send_metadata()
+					self.invalidate_seek(None)
+				await asyncio.sleep(1)
+			except Exception as e:
+				handle(e)
 
 	def run(self):
 		log("setup event loop")
 
 		mpris_bus_name = "org.mpris.MediaPlayer2.kodi"
 
+		try:
+			bus = ravel.session_bus()
+			if bus.request_name\
+				(
+				bus_name = mpris_bus_name,
+				flags = DBUS.NAME_FLAG_DO_NOT_QUEUE
+				) != DBUS.REQUEST_NAME_REPLY_PRIMARY_OWNER:
+					return
+		except DBusError as e:
+			infhandle(e)
+			log("cannot connect dbus")
+			return
+
 		self.loop = asyncio.new_event_loop()
 		self.loop.create_task(self.poll_info())
-
-		bus = ravel.session_bus()
 
 		self.mp2 = MediaPlayer2(bus)
 		self.mp2p = MediaPlayer2Player(bus)
 
 		bus.attach_asyncio(self.loop)
 
-		if bus.request_name\
-			(
-			bus_name = mpris_bus_name,
-			flags = DBUS.NAME_FLAG_DO_NOT_QUEUE
-			) != DBUS.REQUEST_NAME_REPLY_PRIMARY_OWNER:
-				return
 		self.owner = True
 
 		bus.register \
@@ -119,6 +131,8 @@ class Mpris():
 	def start(self):
 		self.th = Thread(target = self.run)
 		self.th.start()
+		time.sleep(0.1)
+		return self.th.is_alive()
 
 	def invalidate_seek(self, data):
 		if self.mp2p is not None:

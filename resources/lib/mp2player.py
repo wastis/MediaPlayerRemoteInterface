@@ -82,7 +82,7 @@ class MediaPlayer2Player :
 		out_signature = "",
 	  )
 	def handle_Pause(self) :
-		KodiInfo.SendKey("play_pause")
+		KodiInfo.SendKey("pause")
 
 	@ravel.method \
 	  (
@@ -383,7 +383,6 @@ class MediaPlayer2Player :
 	def send_metadata(self, data = None) :
 		if data is None:
 			data = KodiInfo.GetMediaInfo()
-
 		self.send_prop_change('Metadata','a{sv}', data)
 
 	@staticmethod

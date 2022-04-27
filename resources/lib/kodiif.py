@@ -130,6 +130,7 @@ class KodiInfo():
 					"art","artist","genre","year","thumbnail",
 					"channel", "season", "episode","director"
 					]
+
 				}
 			})
 
@@ -149,6 +150,13 @@ class KodiInfo():
 			})
 
 		return str(cls.get_result(result,["item","label"]))
+
+	@staticmethod
+	def get_default_icon():
+		path = os.path.abspath(__file__)
+		return \
+			path[:path.rfind("/resources/")+11] \
+			+ "media/kodi_logo.jpg"
 
 	@classmethod
 	def GetCachedTexture(cls,item):
@@ -193,6 +201,9 @@ class KodiInfo():
 				result['mpris:artUrl'] = ('s',art)
 				break
 
+		if 'mpris:artUrl' not in result:
+			result['mpris:artUrl'] = ('s',cls.get_default_icon())
+
 		if item['title']:
 			result['xesam:title'] =  ('s',item['title'])
 		elif item['label']:
@@ -233,51 +244,40 @@ class KodiInfo():
 		return result
 
 	@classmethod
-	def GetEpisodeDetails(cls,item):
-		result = cls.get_art_title(item,['season.poster','tvshow.poster','thumb'])
-
-		info =""
+	def GetInfoVideo(cls,item, result, is_tvshow):
+		info = ""
 		if item['year']:
 			result['xesam:contentCreated'] = ('s',"{}".format(item['year']))
 			info ="{} ".format(item['year'])
 
-		if item['showtitle']:
+		if item['genre']:
+			result['xesam:genre'] = ('as',item['genre'])
+
+		if is_tvshow and item['showtitle']:
 			info = cls.append_cond(info," - ") + "{}  ".format(item['showtitle'])
 
 		if item['director']:
 			info = cls.append_cond(info," - ")  + ",".join(item['director'])
 
-		if item['genre']:
-			result['xesam:genre'] = ('as',item['genre'])
-
-		if info:
-			info = info + " - {:02d}x{:02d}".format(item['season'], item['episode'])
-		else:
-			info = "{:02d}x{:02d}".format(item['season'], item['episode'])
+		if is_tvshow:
+			if info:
+				info = info + " - {:02d}x{:02d}".format(item['season'], item['episode'])
+			else:
+				info = "{:02d}x{:02d}".format(item['season'], item['episode'])
 
 		result['xesam:artist'] = ('s',info)
 
 		return result
 
 	@classmethod
+	def GetEpisodeDetails(cls,item):
+		result = cls.get_art_title(item,['season.poster','tvshow.poster','thumb'])
+		return cls.GetInfoVideo(item, result, True)
+
+	@classmethod
 	def GetMovieDetails(cls,item):
 		result = cls.get_art_title(item,['landscape','poster','thumb'])
-
-		info =""
-		if item['year']:
-			result['xesam:contentCreated'] = ('s',"{}".format(item['year']))
-			info = "{} ".format(item['year'])
-
-		if item['director']:
-			info = cls.append_cond(info," - ")  + ",".join(item['director'])
-
-		if item['genre']:
-			result['xesam:genre'] = ('as',item['genre'])
-
-		if info:
-			result['xesam:artist'] = ('s',info)
-
-		return result
+		return cls.GetInfoVideo(item, result, False)
 
 	@staticmethod
 	def find_broadcast(broadcasts, bcid):
@@ -299,28 +299,46 @@ class KodiInfo():
 		return cls.get_art_title(item,['thumb','thumbnail'])
 
 	@classmethod
+	def GetMediaInfoAudio(cls,item):
+		if item["type"]=="channel":
+			result = cls.GetChannelDetails(item)
+		else:
+			result = cls.GetAudioDetails(item)
+		return result
+
+	@classmethod
+	def GetMediaInfoVideo(cls,item):
+		if "id" not in item or item["type"]=="unknown":
+			result = cls.GetDefaultDetails(item)
+		elif item["type"]=="episode":
+			result = cls.GetEpisodeDetails(item)
+		elif item["type"]=="movie":
+			result = cls.GetMovieDetails(item)
+		elif item["type"]=="channel":
+			result = cls.GetChannelDetails(item)
+		else:
+			result['xesam:title'] = ('s',item['label'])
+
+		return result
+
+	@classmethod
 	def GetMediaInfo(cls):
 		result = {}
 
 		player = cls.GetActivePlayers()
 		if not player:
-			return {}
+			return {
+				'mpris:artUrl':('s',cls.get_default_icon()),
+				'xesam:artist': ('as',['']),
+				'xesam:title': ('s','')
+				}
 
 		item = cls.GetItem(player["playerid"])
 		if player["type"]== 'audio':
-			result = cls.GetAudioDetails(item)
+			result = cls.GetMediaInfoAudio(item)
 
 		elif player["type"]== 'video':
-			if "id" not in item or item["type"]=="unknown":
-				result = cls.GetDefaultDetails(item)
-			elif item["type"]=="episode":
-				result = cls.GetEpisodeDetails(item)
-			elif item["type"]=="movie":
-				result = cls.GetMovieDetails(item)
-			elif item["type"]=="channel":
-				result = cls.GetChannelDetails(item)
-			else:
-				result['xesam:title'] = ('s',item['label'])
+			result = cls.GetMediaInfoVideo(item)
 
 		if 'xesam:title' not in result:
 			result['xesam:title'] = ('s', item['label'])
@@ -338,6 +356,12 @@ class KodiInfo():
 		legth = cls.GetTotalTime(player["playerid"])
 		if legth:
 			result["mpris:length"] = ('x', legth)
+
+		if 'xesam:artist' not in result:
+			result['xesam:artist'] = ('s', '')
+
+		if result['xesam:title'] == result['xesam:artist']:
+			result['xesam:artist'] = ('s', '')
 
 		return result
 

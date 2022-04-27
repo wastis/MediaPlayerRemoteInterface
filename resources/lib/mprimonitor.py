@@ -10,23 +10,32 @@
 #	or (at your option) any later version.
 #
 
+import sys
 import xbmc
 from log import log
+from log import logerror
 from mpris import Mpris
 
 class MpriMonitor( xbmc.Monitor ):
 	def __init__( self ):
 		#strat process
 		xbmc.Monitor.__init__( self )
-		log("start monitor")
+
+		if sys.version_info < (3, 5):
+			logerror("version problem, python 3.5.0+ required")
+			logerror("current version is: " +str(sys.version))
+			return
+
+		log("start mpris service")
 
 		self.mpr = Mpris()
-		self.mpr.start()
-
-		self.wait_abort()
+		if self.mpr.start():
+			self.wait_abort()
+		else:
+			log("start failed, stopping mpris service")
 
 		self.mpr.stop()
-		log("end monitor")
+		log("mpris service done, exit")
 
 	def wait_abort(self):
 		while not self.abortRequested():
