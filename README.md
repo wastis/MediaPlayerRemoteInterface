@@ -2,7 +2,7 @@
 
 This Kodi addon provides a MPRIS interface for better integration of Kodi into Linux desktops.
 
-Version 1.0.6
+[Version 1.0.6](https://github.com/wastis/LinuxAddonRepo)
 
 It forwards the desktop- and keyboard multimedia control events to Kodi and provides meta data back to the desktop for display in system tray controls.
 
