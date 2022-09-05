@@ -2,9 +2,15 @@
 
 This Kodi addon provides a MPRIS interface for better integration of Kodi into Linux desktops.
 
+Version 1.0.6
+
 It forwards the desktop- and keyboard multimedia control events to Kodi and provides meta data back to the desktop for display in system tray controls.
 
-![Cinnamon Sound Tray Icon](/resources/media/kodi-cinnamon-applet-player-small.jpg)
+![Cinnamon Sound Tray Icon](resources/media/kodi-cinnamon-applet-player-small.jpg)
+
+## Installation
+
+This addon is included into the [Linux Addon Repository](https://github.com/wastis/LinuxAddonRepo). It is recommended to use the repository for the installation of the addon. This will ease version upgrades. 
 
 ## Testing via command line
 
