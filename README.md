@@ -13,7 +13,7 @@ It forwards the desktop- and keyboard multimedia control events to Kodi and prov
 This addon is included into the [Linux Addon Repository](https://github.com/wastis/LinuxAddonRepo). It is recommended to use the repository for the installation of the addon. This will ease version upgrades. 
 
 ## Flatpak
-If Kodi has been installed from flatpak, additional access rights have to be granted to the the Kodi sandbox for the addon to work correctly.
+If Kodi had been installed from flatpak, additional access rights have to be granted to the the Kodi sandbox for the addon to work correctly.
 
 	sudo flatpak override --socket=session-bus tv.kodi.Kodi
 
