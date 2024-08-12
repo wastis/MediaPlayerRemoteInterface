@@ -15,7 +15,7 @@ This addon is included into the [Linux Addon Repository](https://github.com/wast
 ## Flatpak
 If Kodi had been installed from flatpak, additional access rights have to be granted to the the Kodi sandbox for the addon to work correctly.
 
-	sudo flatpak override --socket=session-bus tv.kodi.Kodi
+	flatpak override --user --own-name=org.mpris.MediaPlayer2.kodi tv.kodi.Kodi
 
 ## Testing via command line
 
