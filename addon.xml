@@ -17,6 +17,9 @@
 		<disclaimer lang="de_DE">https://github.com/wastis/MediaPlayerRemoteInterface</disclaimer>
 		<news>
 
+v1.0.8
+- change mpris name to tv.kodi.Kodi for simplified flatpak installation
+
 v1.0.7
 - translate play command from the OS to the play_pause command. 
 This should fix problems on e.g. KDE. 
