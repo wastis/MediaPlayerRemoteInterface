@@ -50,7 +50,7 @@ class Mpris():
 	def run(self):
 		log("setup event loop")
 
-		mpris_bus_name = "org.mpris.MediaPlayer2.kodi"
+		mpris_bus_name = "org.mpris.MediaPlayer2.tv.kodi.Kodi"
 
 		try:
 			bus = ravel.session_bus()
